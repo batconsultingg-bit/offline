@@ -524,7 +524,7 @@
         <script>
             (function(){
               // ====== НАСТРОЙКИ — поменяйте под себя ======
-              var WHATSAPP_NUMBER = "996706441050"; // TODO: вставьте реальный номер WhatsApp офиса, без "+" и без пробелов
+              var WHATSAPP_NUMBER = "996700000000"; // TODO: вставьте реальный номер WhatsApp офиса, без "+" и без пробелов
               var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAw959NHDMQhFG_Ytn-60ff8sIgXPlSf7MjHfXEf3h3PGClbn1vIg80EavRxfvEM-VJA/exec";
               var WORK_HOURS = ["09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
               var DAYS_AHEAD = 14;   // сколько дней показывать
@@ -543,6 +543,7 @@
 
               var selectedDateKey = null, selectedTime = null, sending = false;
               var taken = {};
+              var scheduleReady = false; // true только после первого успешного/завершённого запроса занятых слотов
 
               var params = new URLSearchParams(location.search);
               var SOURCE_NAMES = { ig:"Instagram", instagram:"Instagram", ig_ads:"Instagram таргет", tiktok:"TikTok", ref:"Рекомендация", offline:"Оффлайн", wa:"WhatsApp", tg:"Telegram" };
@@ -578,7 +579,9 @@
                   chip.type = 'button';
                   chip.className = 'date-chip' + ((d.getDay() === 0 || d.getDay() === 6) ? ' weekend' : '');
                   chip.dataset.key = k;
-                  chip.disabled = off || dayFull(k);
+                  // Пока расписание не загрузилось — все даты неактивны, чтобы нельзя было
+                  // выбрать уже занятый слот в то окно, пока идёт запрос занятых мест.
+                  chip.disabled = !scheduleReady || off || dayFull(k);
                   chip.setAttribute('aria-label', humanDate(k));
                   chip.innerHTML = '<span class="dow">'+DOWS[d.getDay()]+'</span><span class="num">'+d.getDate()+'</span><span class="mon">'+MONTHS[d.getMonth()]+'</span>';
                   if (k === selectedDateKey) chip.classList.add('selected');
@@ -596,6 +599,10 @@
               }
 
               function renderTimes(){
+                if (!scheduleReady){
+                  timeGrid.innerHTML = '<div class="time-empty">Загружаем расписание…</div>';
+                  return;
+                }
                 if (!selectedDateKey){
                   timeGrid.innerHTML = '<div class="time-empty">Сначала выберите день</div>';
                   return;
@@ -643,18 +650,31 @@
               }
 
               function loadTaken(){
-                if (!SCRIPT_URL) return Promise.resolve();
-                return fetch(SCRIPT_URL, { method:'GET' })
-                  .then(function(r){ return r.json(); }).then(function(data){
+                function finish(){
+                  scheduleReady = true;
+                  buildDates();
+                  if (selectedDateKey){
+                    if (selectedTime && isTaken(selectedDateKey, selectedTime)) selectedTime = null;
+                  }
+                  renderTimes();
+                  updateSummary();
+                }
+
+                if (!SCRIPT_URL){ finish(); return Promise.resolve(); }
+
+                // Подстраховка: если Google долго не отвечает, не держим форму
+                // заблокированной вечно — через 4 секунды открываем её как есть.
+                var ctrl = ('AbortController' in window) ? new AbortController() : null;
+                var timer = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 4000);
+
+                return fetch(SCRIPT_URL, { method:'GET', signal: ctrl ? ctrl.signal : undefined })
+                  .then(function(r){ clearTimeout(timer); return r.json(); })
+                  .then(function(data){
                     taken = {};
                     (data.taken || []).forEach(function(s){ taken[s] = true; });
-                    buildDates();
-                    if (selectedDateKey){
-                      if (selectedTime && isTaken(selectedDateKey, selectedTime)) selectedTime = null;
-                      renderTimes(); updateSummary();
-                    }
                   })
-                  .catch(function(){ /* без списка занятых слотов страница всё равно работает */ });
+                  .catch(function(){ clearTimeout(timer); /* работаем без списка занятых мест */ })
+                  .then(finish);
               }
 
               function saveBooking(payload){
@@ -705,26 +725,41 @@
                   return;
                 }
 
-                sending = true;
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Записываем…';
+                var bookedDate = selectedDateKey;
+                var bookedTime = selectedTime;
 
-                saveBooking({ name:name, phone:phone, date:selectedDateKey, time:selectedTime, source:SOURCE, content:CONTENT })
+                // Показываем успех сразу, не дожидаясь ответа сервера — так кнопка
+                // не "висит" несколько секунд. Запрос продолжает идти в фоне; если
+                // окажется, что это время только что заняли (редкий случай), ниже
+                // аккуратно откатываем обратно на форму с объяснением.
+                sending = true;
+                taken[bookedDate + ' ' + bookedTime] = true;
+                showSuccess(name, phone);
+
+                saveBooking({ name:name, phone:phone, date:bookedDate, time:bookedTime, source:SOURCE, content:CONTENT })
                   .then(function(res){
-                    if (res && res.ok){
-                      taken[selectedDateKey + ' ' + selectedTime] = true;
-                      showSuccess(name, phone);
-                    } else if (res && res.error === 'taken'){
+                    if (res && res.ok) return;
+
+                    // Конфликт или ошибка сервера — откатываем обратно к форме
+                    success.classList.remove('show');
+                    formBody.classList.remove('hidden');
+                    selectedDateKey = bookedDate;
+                    selectedTime = null;
+
+                    if (res && res.error === 'taken'){
                       showError('Это время только что заняли. Выберите, пожалуйста, другое.');
-                      taken[selectedDateKey + ' ' + selectedTime] = true;
-                      selectedTime = null;
-                      loadTaken(); renderTimes();
                     } else {
                       showError('Не получилось записать. Проверьте данные и попробуйте ещё раз или <a href="'+waLink('Здравствуйте! Хочу записаться на консультацию.')+'" target="_blank" rel="noopener">напишите нам в WhatsApp</a>.');
                     }
+                    loadTaken();
                   })
                   .catch(function(){
+                    success.classList.remove('show');
+                    formBody.classList.remove('hidden');
+                    selectedDateKey = bookedDate;
+                    selectedTime = null;
                     showError('Нет связи с сервером. Проверьте интернет и нажмите «Записаться» ещё раз или <a href="'+waLink('Здравствуйте! Хочу записаться на консультацию.')+'" target="_blank" rel="noopener">напишите нам в WhatsApp</a>.');
+                    loadTaken();
                   })
                   .then(function(){
                     sending = false;
@@ -742,7 +777,8 @@
                 loadTaken();
               });
 
-              buildDates();
+              // Сначала грузим расписание — даты и время строятся только после этого
+              // (или после тайм-аута), чтобы занятые слоты не мелькали кликабельными.
               renderTimes();
               updateSummary();
               loadTaken();
