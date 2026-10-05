@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Запись на консультацию — BAT Consulting</title>
+<style>
+  :root{
+    --primary:#028090;
+    --secondary:#00A896;
+    --accent:#02C39A;
+    --dark:#013A40;
+    --ink:#132a2e;
+    --muted:#5c7a80;
+    --bg:#fbfdfd;
+    --card:#f2f8f8;
+    --line:#dce9ea;
+    --taken:#e9edee;
+    --taken-text:#9fb0b3;
+    box-sizing:border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top: env(safe-area-inset-top, 0px);}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .hero{
+    background:
+      radial-gradient(ellipse 480px 320px at 88% -10%, rgba(2,195,154,0.35), transparent 70%),
+      linear-gradient(180deg,var(--dark),#014d55 85%);
+    color:#fff;
+    padding:2.6rem 1.4rem 3.4rem;
+    text-align:left;
+  }
+  .hero .brand{
+    font-size:.8rem;
+    letter-spacing:.06em;
+    color:#8fd4d1;
+    margin:0 0 .9rem;
+    font-weight:600;
+  }
+  .hero h1{
+    font-family:Georgia,Cambria,"Times New Roman",serif;
+    font-size:clamp(1.7rem,6vw,2.3rem);
+    line-height:1.18;
+    margin:0 0 .7rem;
+    max-width:19ch;
+  }
+  .hero p{
+    margin:0;
+    color:#cfe8e6;
+    font-size:1rem;
+    max-width:38ch;
+    line-height:1.5;
+  }
+  .wrap{
+    max-width:520px;
+    margin:0 auto;
+    padding:0 1.1rem;
+  }
+  .card{
+    background:#fff;
+    border-radius:18px;
+    margin-top:-2.1rem;
+    padding:1.5rem 1.3rem 1.7rem;
+    box-shadow:0 18px 40px -22px rgba(1,58,64,.35);
+    border:1px solid var(--line);
+  }
+  .step{
+    margin-top:1.7rem;
+  }
+  .step:first-child{margin-top:0;}
+  .step-head{
+    display:flex;
+    align-items:center;
+    gap:.6rem;
+    margin-bottom:.8rem;
+  }
+  .step-num{
+    width:1.55rem;height:1.55rem;
+    border-radius:50%;
+    background:var(--primary);
+    color:#fff;
+    font-size:.82rem;
+    font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    flex:none;
+  }
+  .step-title{
+    font-weight:700;
+    font-size:1rem;
+    color:var(--ink);
+  }
+  .step-sub{
+    font-size:.82rem;
+    color:var(--muted);
+    margin:.1rem 0 0 2.15rem;
+  }
+
+  .date-row{
+    display:flex;
+    gap:.5rem;
+    overflow-x:auto;
+    padding:.2rem .1rem .5rem;
+    margin:0 -.1rem;
+    scroll-snap-type:x proximity;
+  }
+  .date-row::-webkit-scrollbar{display:none;}
+  .date-chip{
+    scroll-snap-align:start;
+    flex:none;
+    width:3.6rem;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:12px;
+    padding:.55rem .3rem;
+    text-align:center;
+    cursor:pointer;
+    transition:background .15s, border-color .15s, transform .1s;
+  }
+  .date-chip .dow{
+    display:block;
+    font-size:.68rem;
+    color:var(--muted);
+    text-transform:lowercase;
+    margin-bottom:.15rem;
+  }
+  .date-chip .num{
+    display:block;
+    font-size:1.05rem;
+    font-weight:700;
+    color:var(--ink);
+  }
+  .date-chip.selected{
+    background:var(--primary);
+    border-color:var(--primary);
+  }
+  .date-chip.selected .dow,
+  .date-chip.selected .num{color:#fff;}
+  .date-chip:active{transform:scale(.96);}
+
+  .time-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:.55rem;
+  }
+  .time-slot{
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:10px;
+    padding:.65rem .4rem;
+    text-align:center;
+    font-size:.92rem;
+    font-weight:600;
+    color:var(--ink);
+    cursor:pointer;
+    transition:background .15s, border-color .15s, transform .1s;
+  }
+  .time-slot:active{transform:scale(.96);}
+  .time-slot.selected{
+    background:var(--primary);
+    border-color:var(--primary);
+    color:#fff;
+  }
+  .time-slot.taken{
+    background:var(--taken);
+    border-color:var(--taken);
+    color:var(--taken-text);
+    cursor:not-allowed;
+    text-decoration:line-through;
+  }
+  .time-hint{
+    font-size:.78rem;
+    color:var(--muted);
+    margin-top:.6rem;
+  }
+
+  .field{
+    margin-bottom:.9rem;
+  }
+  .field label{
+    display:block;
+    font-size:.82rem;
+    font-weight:600;
+    color:var(--ink);
+    margin-bottom:.35rem;
+  }
+  .field input{
+    width:100%;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:10px;
+    padding:.75rem .85rem;
+    font-size:1rem;
+    color:var(--ink);
+    font-family:inherit;
+  }
+  .field input:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+    background:#fff;
+  }
+
+  .summary{
+    background:var(--card);
+    border:1px dashed var(--line);
+    border-radius:12px;
+    padding:.8rem .9rem;
+    font-size:.88rem;
+    color:var(--ink);
+    margin:1.6rem 0 1rem;
+    min-height:1.2em;
+  }
+  .summary b{color:var(--primary);}
+  .summary.empty{color:var(--muted);}
+
+  .submit-btn{
+    width:100%;
+    border:none;
+    border-radius:12px;
+    background:var(--primary);
+    color:#fff;
+    font-size:1rem;
+    font-weight:700;
+    padding:.95rem 1rem;
+    cursor:pointer;
+    transition:background .15s, opacity .15s;
+  }
+  .submit-btn:disabled{
+    opacity:.45;
+    cursor:not-allowed;
+  }
+  .submit-btn:not(:disabled):active{background:var(--dark);}
+
+  .note{
+    font-size:.78rem;
+    color:var(--muted);
+    text-align:center;
+    margin-top:.9rem;
+    line-height:1.4;
+  }
+
+  .success{
+    display:none;
+    text-align:center;
+    padding:1.2rem 0 .4rem;
+  }
+  .success.show{display:block;}
+  .success .tick{
+    width:3.2rem;height:3.2rem;
+    border-radius:50%;
+    background:var(--accent);
+    color:#fff;
+    font-size:1.5rem;
+    display:flex;align-items:center;justify-content:center;
+    margin:0 auto .9rem;
+  }
+  .success h2{
+    font-family:Georgia,Cambria,serif;
+    font-size:1.3rem;
+    margin:0 0 .5rem;
+  }
+  .success p{
+    color:var(--muted);
+    font-size:.92rem;
+    line-height:1.5;
+    margin:0 0 1.3rem;
+  }
+  .success .again{
+    font-size:.85rem;
+    color:var(--primary);
+    font-weight:600;
+    cursor:pointer;
+    background:none;
+    border:none;
+    text-decoration:underline;
+  }
+  .form-body.hidden{display:none;}
+
+  footer{
+    text-align:center;
+    color:var(--muted);
+    font-size:.76rem;
+    padding:1.8rem 1rem 2.2rem;
+  }
+</style>
+</head>
+<body>
+
+  <div class="hero">
+    <div class="wrap" style="padding:0;">
+      <p class="brand">BAT CONSULTING</p>
+      <h1>Запишитесь на бесплатную консультацию</h1>
+      <p>Выберите удобный день и время — встретимся офлайн в офисе и разберём ваш план поступления.</p>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+
+      <div class="form-body" id="formBody">
+
+        <div class="step">
+          <div class="step-head">
+            <span class="step-num">1</span>
+            <span class="step-title">Выберите день</span>
+          </div>
+          <div class="date-row" id="dateRow"></div>
+        </div>
+
+        <div class="step">
+          <div class="step-head">
+            <span class="step-num">2</span>
+            <span class="step-title">Выберите время</span>
+          </div>
+          <p class="step-sub" style="margin-bottom:.8rem;">Консультации проходят с 9:00 до 19:00</p>
+          <div class="time-grid" id="timeGrid"></div>
+        </div>
+
+        <div class="step">
+          <div class="step-head">
+            <span class="step-num">3</span>
+            <span class="step-title">Ваши контакты</span>
+          </div>
+          <div class="field">
+            <label for="nameInput">Имя</label>
+            <input id="nameInput" type="text" placeholder="Как к вам обращаться" autocomplete="name">
+          </div>
+          <div class="field">
+            <label for="phoneInput">Телефон (WhatsApp)</label>
+            <input id="phoneInput" type="tel" placeholder="+996 XXX XXX XXX" autocomplete="tel">
+          </div>
+        </div>
+
+        <div class="summary empty" id="summary">Выберите день, время и укажите контакты</div>
+
+        <button class="submit-btn" id="submitBtn" disabled>Записаться</button>
+        <p class="note">Заявка отправится нам в WhatsApp — мы подтвердим время в течение дня.</p>
+      </div>
+
+      <div class="success" id="success">
+        <div class="tick">✓</div>
+        <h2>Заявка отправлена</h2>
+        <p id="successText">Мы подтвердим время в WhatsApp в ближайшее время.</p>
+        <button class="again" id="againBtn">Записаться на другое время</button>
+      </div>
+
+    </div>
+
+    <footer>BAT Consulting · консультации офлайн, в офисе</footer>
+  </div>
+
+<script>
+(function(){
+  // ====== НАСТРОЙКИ — поменяйте под себя ======
+  var WHATSAPP_NUMBER = "996700000000"; // номер WhatsApp агентства, без "+" и без пробелов
+  var WORK_HOURS = ["09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
+  var DAYS_AHEAD = 14; // сколько дней вперёд показывать
+  // =============================================
+
+  var MONTHS = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
+  var DOWS = ["вс","пн","вт","ср","чт","пт","сб"];
+
+  var dateRow = document.getElementById('dateRow');
+  var timeGrid = document.getElementById('timeGrid');
+  var summary = document.getElementById('summary');
+  var submitBtn = document.getElementById('submitBtn');
+  var nameInput = document.getElementById('nameInput');
+  var phoneInput = document.getElementById('phoneInput');
+  var formBody = document.getElementById('formBody');
+  var success = document.getElementById('success');
+  var successText = document.getElementById('successText');
+  var againBtn = document.getElementById('againBtn');
+
+  var dates = [];
+  var selectedDateKey = null;
+  var selectedTime = null;
+
+  function pad(n){ return n < 10 ? '0'+n : ''+n; }
+  function dateKey(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+
+  function takenKey(dKey, t){ return 'bat-booking:'+dKey+':'+t; }
+  function isTaken(dKey, t){
+    try { return localStorage.getItem(takenKey(dKey,t)) === '1'; }
+    catch(e){ return false; }
+  }
+  function markTaken(dKey, t){
+    try { localStorage.setItem(takenKey(dKey,t), '1'); } catch(e){}
+  }
+
+  function buildDates(){
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    for (var i = 0; i < DAYS_AHEAD; i++){
+      var d = new Date(today);
+      d.setDate(d.getDate() + i);
+      dates.push(d);
+
+      var chip = document.createElement('div');
+      chip.className = 'date-chip';
+      chip.dataset.key = dateKey(d);
+      chip.innerHTML = '<span class="dow">'+DOWS[d.getDay()]+'</span><span class="num">'+d.getDate()+'</span>';
+      chip.addEventListener('click', function(d){
+        return function(){ selectDate(d); };
+      }(d));
+      dateRow.appendChild(chip);
+    }
+  }
+
+  function selectDate(d){
+    selectedDateKey = dateKey(d);
+    selectedTime = null;
+    Array.prototype.forEach.call(dateRow.children, function(c){
+      c.classList.toggle('selected', c.dataset.key === selectedDateKey);
+    });
+    renderTimes();
+    updateSummary();
+  }
+
+  function renderTimes(){
+    timeGrid.innerHTML = '';
+    WORK_HOURS.forEach(function(t){
+      var slot = document.createElement('div');
+      var taken = selectedDateKey && isTaken(selectedDateKey, t);
+      slot.className = 'time-slot' + (taken ? ' taken' : '');
+      slot.textContent = t;
+      if (!taken){
+        slot.addEventListener('click', function(){ selectTime(t, slot); });
+      }
+      timeGrid.appendChild(slot);
+    });
+  }
+
+  function selectTime(t, el){
+    selectedTime = t;
+    Array.prototype.forEach.call(timeGrid.children, function(c){
+      c.classList.remove('selected');
+    });
+    el.classList.add('selected');
+    updateSummary();
+  }
+
+  function formatDateHuman(dKey){
+    var parts = dKey.split('-').map(Number);
+    var d = new Date(parts[0], parts[1]-1, parts[2]);
+    return d.getDate() + ' ' + MONTHS[d.getMonth()];
+  }
+
+  function updateSummary(){
+    var name = nameInput.value.trim();
+    var phone = phoneInput.value.trim();
+    var ready = selectedDateKey && selectedTime && name && phone;
+    submitBtn.disabled = !ready;
+
+    if (!selectedDateKey && !selectedTime){
+      summary.className = 'summary empty';
+      summary.textContent = 'Выберите день, время и укажите контакты';
+      return;
+    }
+    summary.className = 'summary';
+    var bits = [];
+    if (selectedDateKey) bits.push('<b>' + formatDateHuman(selectedDateKey) + '</b>');
+    if (selectedTime) bits.push('<b>' + selectedTime + '</b>');
+    var txt = 'Консультация: ' + bits.join(' в ');
+    if (name) txt += '<br>Имя: ' + name;
+    summary.innerHTML = txt;
+  }
+
+  nameInput.addEventListener('input', updateSummary);
+  phoneInput.addEventListener('input', updateSummary);
+
+  submitBtn.addEventListener('click', function(){
+    if (submitBtn.disabled) return;
+    var name = nameInput.value.trim();
+    var phone = phoneInput.value.trim();
+    var dateHuman = formatDateHuman(selectedDateKey);
+
+    var message = 'Здравствуйте! Хочу записаться на бесплатную консультацию.\n' +
+      'Дата: ' + dateHuman + '\n' +
+      'Время: ' + selectedTime + '\n' +
+      'Имя: ' + name + '\n' +
+      'Телефон: ' + phone;
+
+    var waUrl = 'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(message);
+    window.open(waUrl, '_blank');
+
+    markTaken(selectedDateKey, selectedTime);
+
+    successText.textContent = 'Ждём вас ' + dateHuman + ' в ' + selectedTime + '. Если что-то изменится — напишите нам в WhatsApp.';
+    formBody.classList.add('hidden');
+    success.classList.add('show');
+  });
+
+  againBtn.addEventListener('click', function(){
+    success.classList.remove('show');
+    formBody.classList.remove('hidden');
+    selectedDateKey = null;
+    selectedTime = null;
+    nameInput.value = '';
+    phoneInput.value = '';
+    Array.prototype.forEach.call(dateRow.children, function(c){ c.classList.remove('selected'); });
+    timeGrid.innerHTML = '';
+    updateSummary();
+  });
+
+  buildDates();
+  updateSummary();
+})();
+</script>
+
+</body>
+</html>
